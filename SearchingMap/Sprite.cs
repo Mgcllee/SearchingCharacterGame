@@ -9,7 +9,6 @@ namespace SearchingMap
         private Texture2D _texture;
         public Vector2 _position;
         public float Speed = 2f;
-        private NetworkModule network;
 
         private bool start_network = false;
 
@@ -17,22 +16,10 @@ namespace SearchingMap
         {
             this._texture = texture;
             _position = new Vector2(100, 100);
-            network = new NetworkModule();
         }
 
         public void Update()
         {
-            if(Keyboard.GetState().IsKeyDown(Keys.Escape))
-            {
-                network.connect_server();
-                start_network = true;
-            }
-            if(start_network)
-            {
-                _position = network.get_position();
-            }
-            return;
-
             if (Keyboard.GetState().IsKeyDown(Keys.Up) && 2 <= _position.Y)
             {
                 // up
