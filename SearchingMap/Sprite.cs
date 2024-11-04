@@ -8,9 +8,6 @@ namespace SearchingMap
     {
         private Texture2D _texture;
         public Vector2 _position;
-        public float Speed = 2f;
-
-        private bool start_network = false;
 
         public Sprite(Texture2D texture)
         {

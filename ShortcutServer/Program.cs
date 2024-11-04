@@ -2,11 +2,15 @@
 using System.Text;
 using System.Net;
 using System.Net.Sockets;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Example
 {
     class Program
     {
+        private static string data;
+        private static readonly object lockObject = new object();
+
         static void client_recver(int client_ticket, Socket client)
         {
             var ip = client.RemoteEndPoint as IPEndPoint;
@@ -15,16 +19,15 @@ namespace Example
             var sb = new StringBuilder();
             var binary = new Byte[1024];
 
+            var sendMsg = new byte[binary.Length];
             while (true)
             {
-                string data = Console.ReadLine();
-                if (data == null) break;
-                if (int.Parse(data.Substring(0, 2)) == client_ticket)
+                lock (lockObject)
                 {
-                    data = data.Substring(2);
-                    var sendMsg = Encoding.ASCII.GetBytes(data);
-                    client.Send(sendMsg);
+                    if (data == null) continue;
+                    sendMsg = Encoding.ASCII.GetBytes(data);
                 }
+                client.Send(sendMsg);
             }
         }
 
@@ -44,8 +47,16 @@ namespace Example
                     clients.Add(new Thread(() => client_recver(i, server.Accept())));
                     clients[i].Start();
                 }
-
-                while(true);
+            
+                while(true)
+                {
+                    Console.WriteLine("[new Order]");
+                    lock (lockObject)
+                    {
+                        data = new string(Console.ReadLine());
+                        if(data == null) break;
+                    }
+                }
             }
             Console.WriteLine("Press Any key...");
         }

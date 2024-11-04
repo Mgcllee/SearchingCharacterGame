@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Reflection.PortableExecutable;
@@ -17,8 +18,8 @@ namespace SearchingMap
     public class Game1 : Game
     {
         private SpriteBatch _spriteBatch;
-        private NetworkModule _networkModule;
-        private Sprite charater;
+        private Texture2D texture;
+        private Dictionary<int, Sprite> players;
 
         private TcpClient _client;
         private NetworkStream _stream;
@@ -35,7 +36,7 @@ namespace SearchingMap
             // TODO: Add your initialization logic here
 
             StartReceivingDataAsync();
-
+            players = new Dictionary<int, Sprite>();
             base.Initialize();
         }
         private void SetupWindows()
@@ -50,8 +51,7 @@ namespace SearchingMap
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-            Texture2D texture = Content.Load<Texture2D>("character");
-            charater = new Sprite(texture);
+            texture = Content.Load<Texture2D>("character");
         }
 
         private async void StartReceivingDataAsync()
@@ -65,15 +65,24 @@ namespace SearchingMap
             {
                 while (true)
                 {
-                    // 비동기적으로 데이터 수신
                     int bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length);
                     if (bytesRead > 0)
                     {
                         string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                         string[] pos = receivedData.Split(" ");
 
-                        charater._position.X = int.Parse(pos[0]);
-                        charater._position.Y = int.Parse(pos[1]);
+                        int player_ticket = int.Parse(pos[0]);
+                        if (players.ContainsKey(player_ticket))
+                        {
+                            players[player_ticket]._position.X = int.Parse(pos[1]);
+                            players[player_ticket]._position.Y = int.Parse(pos[2]);
+                        }
+                        else
+                        {
+                            players.Add(player_ticket, new Sprite(texture)); 
+                            players[player_ticket]._position.X = int.Parse(pos[1]);
+                            players[player_ticket]._position.Y = int.Parse(pos[2]);
+                        }
                     }
                 }
             }
@@ -94,8 +103,15 @@ namespace SearchingMap
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
- 
-            charater.Update();
+
+            if(players.Count != 0)
+            {
+                foreach (var player in players)
+                {
+                    player.Value.Update();
+                }
+            }
+           
 
             base.Update(gameTime);
         }
@@ -104,9 +120,16 @@ namespace SearchingMap
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
-            // TODO: Add your drawing code here
             _spriteBatch.Begin();
-            charater.Draw(_spriteBatch);
+
+            if (players.Count != 0)
+            {
+                foreach (var player in players)
+                {
+                    player.Value.Draw(_spriteBatch);
+                }
+            }
+
             _spriteBatch.End();
 
             base.Draw(gameTime);
