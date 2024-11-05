@@ -1,6 +1,8 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
+using System.ComponentModel.Design;
 
 namespace SearchingMap
 {
@@ -8,6 +10,10 @@ namespace SearchingMap
     {
         private Texture2D _texture;
         public Vector2 _position;
+        public int dir = 1;
+
+        private int[] dir_row = new int[8] { -1, -1, 0, 1, 1, 1, 0, -1 };
+        private int[] dir_col = new int[8] { 0, 1, 1, 1, 0, -1, -1, -1 };
 
         public Sprite(Texture2D texture)
         {
@@ -37,8 +43,6 @@ namespace SearchingMap
                 // right
                 _position.X += 2;
             }
-
-            
         }
 
         public void Draw(SpriteBatch spriteBatch)
