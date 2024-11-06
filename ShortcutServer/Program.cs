@@ -1,83 +1,87 @@
 ﻿using System;
-using System.Text;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
+using System.Text;
+using System.Threading;
 
 namespace Example
 {
     class Program
     {
-        private static string data = "";
         private static readonly object lockObject = new object();
-        private static List<Socket> clients_socket = new List<Socket> ();
+        private static List<Socket> clients_socket = new List<Socket>();
+        private static Random random = new Random(); // Random 객체를 클래스 수준에서 생성
+
+        static private async Task print_data(string data)
+        {
+            // 비동기 람다 함수 정의
+            Func<Task> asyncLambda = async () =>
+            {
+                await Task.Delay(2000); // 2초 대기
+                Console.WriteLine(data);
+            };
+
+            // 비동기 람다 함수 호출
+            await asyncLambda();
+        }
 
         static void client_recver(int client_ticket)
         {
-            Console.WriteLine($"Client {client_ticket} : Connection time: {DateTime.Now})");
+            Console.WriteLine($"Client {client_ticket} : Connection time: {DateTime.Now}");
 
-            Vector2 _position = new Vector2();
-            _position.X = 10;
-            _position.Y = 10;
-
+            Vector2 _position = new Vector2(10, 10);
             int dir = 0;
             int[] dir_row = new int[8] { -1, -1, 0, 1, 1, 1, 0, -1 };
             int[] dir_col = new int[8] { 0, 1, 1, 1, 0, -1, -1, -1 };
 
-            var sb = new StringBuilder();
-            var binary = new Byte[1024];
-
-            var sendMsg = new byte[binary.Length];
             while (true)
             {
-                lock (lockObject)
+                Thread.Sleep(100);
+
+                float new_X = _position.X + dir_col[dir] * 2.0f;
+                float new_Y = _position.Y + dir_row[dir] * 2.0f;
+
+                if (0 < new_X && new_X + 100 < 800 && 0 < new_Y && new_Y + 100 < 500)
                 {
-                    // if (data == null)
+                    _position.X = new_X;
+                    _position.Y = new_Y;
+                }
+                else
+                {
+                    dir = random.Next(0, 8);
+                }
+
+                string data = $"{client_ticket} {_position.X} {_position.Y}";
+
+                byte[] sendMsg = Encoding.ASCII.GetBytes(data);
+                if (sendMsg.Length > 0)
+                {
+                    lock (lockObject)
                     {
-                        Thread.Sleep(30);
-
-                        float new_X = _position.X + dir_col[dir] * 4.0f;
-                        float new_Y = _position.Y + dir_row[dir] * 4.0f;
-
-                        if (0 < new_X && new_X + 100 < 800
-                            && 0 < new_Y && new_Y + 100 < 500)
+                        for (int i = 0; i < clients_socket.Count; i++)
                         {
-                            _position.X = new_X;
-                            _position.Y = new_Y;
-                        }
-                        else
-                        {
-                            dir = new Random().Next() % 8;
-                        }
-
-                        data = client_ticket.ToString();
-                        data += " ";
-                        data += _position.X.ToString();
-                        data += " ";
-                        data += _position.Y.ToString();
-                        sendMsg = Encoding.ASCII.GetBytes(data);
-
-                        foreach (var socket in clients_socket)
-                        {
-                            if(sendMsg != null && SocketConnected(socket))
+                            if (clients_socket[i] != null && clients_socket[i].Connected)
                             {
-                                socket.Send(sendMsg);
+                                try
+                                {
+                                    if(_position.X % 10 == 0 && _position.Y % 10 == 0)
+                                    {
+                                        print_data(data);
+                                    }
+                                    clients_socket[i].Send(sendMsg);
+                                }
+                                catch (SocketException ex)
+                                {
+                                    Console.WriteLine($"Error sending to client {i}: {ex.Message}");
+                                    return;
+                                }
                             }
                         }
-                        // client.Send(sendMsg);
                     }
                 }
             }
-        }
-
-        static bool SocketConnected(Socket s)
-        {
-            bool part1 = s.Poll(1000, SelectMode.SelectRead);
-            bool part2 = (s.Available == 0);
-            if (part1 && part2)
-                return false;
-            else
-                return true;
         }
 
         static void Main(string[] args)
@@ -93,20 +97,32 @@ namespace Example
 
                 for (int i = 0; i < 2; i++)
                 {
-                    Socket socket = null;
-                    while(true)
+                    int user_ticket = i;
+                    Socket new_client_socket = null;
+
+                    Console.WriteLine($"wait for new client...");
+                    while (true)
                     {
-                        socket = server.Accept();
-                        if(SocketConnected(socket) && socket != null) break;
+                        new_client_socket = server.Accept();
+                        if (new_client_socket.Connected)
+                        {
+                            lock (lockObject)
+                            {
+                                clients_socket.Add(new_client_socket);
+                            }
+                            break;
+                        }
                     }
-                    clients_socket.Add(socket);
-                    clients.Add(new Thread(() => client_recver(i)));
+                    Console.WriteLine($"Client {user_ticket} connected.");
+                    clients.Add(new Thread(() => client_recver(user_ticket)));
                     clients[i].Start();
                 }
-                
-                while(true)
+
+                Console.WriteLine($"Server Running...");
+                while (true)
                 {
-                    Console.WriteLine($"Server Running...");
+                    // 서버가 계속 실행되도록 대기
+                    Thread.Sleep(1000);
                 }
             }
         }

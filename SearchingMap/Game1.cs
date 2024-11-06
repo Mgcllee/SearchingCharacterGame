@@ -72,17 +72,16 @@ namespace SearchingMap
                         string[] pos = receivedData.Split(" ");
 
                         int player_ticket = int.Parse(pos[0]);
-                        if (players.ContainsKey(player_ticket))
+
+                        if (player_ticket < 0) continue;
+                        
+                        if (false == players.ContainsKey(player_ticket))
                         {
-                            players[player_ticket]._position.X = int.Parse(pos[1]);
-                            players[player_ticket]._position.Y = int.Parse(pos[2]);
+                            players.Add(player_ticket, new Sprite(Content.Load<Texture2D>("character")));
                         }
-                        else
-                        {
-                            players.Add(player_ticket, new Sprite(texture)); 
-                            players[player_ticket]._position.X = int.Parse(pos[1]);
-                            players[player_ticket]._position.Y = int.Parse(pos[2]);
-                        }
+
+                        players[player_ticket]._position.X = int.Parse(pos[1]);
+                        players[player_ticket]._position.Y = int.Parse(pos[2]);
                     }
                 }
             }
