@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ShortcutServer;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -11,7 +12,7 @@ namespace Example
     class Program
     {
         private static readonly object lockObject = new object();
-        private static List<Socket> clients_socket = new List<Socket>();
+        private static List<Client> clients = new List<Client>();
         private static Random random = new Random(); // Random 객체를 클래스 수준에서 생성
 
         static private async Task print_data(string data)
@@ -27,59 +28,62 @@ namespace Example
             await asyncLambda();
         }
 
-        static void client_recver(int client_ticket)
+        static bool check_collision(int client_ticket)
+        {
+            for (int i = 0; i < clients.Count; i++)
+            {
+                if (i == client_ticket) continue;
+                lock (lockObject)
+                {
+                    if (clients[i].is_impact(clients[client_ticket]))
+                    {
+                        Console.WriteLine($"Client ({client_ticket}) and ({i}) impact!!!");
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        static void move_client(int client_ticket)
         {
             Console.WriteLine($"Client {client_ticket} : Connection time: {DateTime.Now}");
-
-            Vector2 _position = new Vector2(10, 10);
-            int dir = 0;
             int[] dir_row = new int[8] { -1, -1, 0, 1, 1, 1, 0, -1 };
             int[] dir_col = new int[8] { 0, 1, 1, 1, 0, -1, -1, -1 };
 
             while (true)
             {
-                Thread.Sleep(100);
+                Thread.Sleep(20);
 
-                float new_X = _position.X + dir_col[dir] * 2.0f;
-                float new_Y = _position.Y + dir_row[dir] * 2.0f;
-
-                if (0 < new_X && new_X + 100 < 800 && 0 < new_Y && new_Y + 100 < 500)
+                lock (lockObject)
                 {
-                    _position.X = new_X;
-                    _position.Y = new_Y;
-                }
-                else
-                {
-                    dir = random.Next(0, 8);
-                }
+                    int dir = clients[client_ticket].dir;
+                    float new_X = clients[client_ticket]._position.X + dir_col[dir] * 2.0f;
+                    float new_Y = clients[client_ticket]._position.Y + dir_row[dir] * 2.0f;
 
-                string data = $"{client_ticket} {_position.X} {_position.Y}";
-
-                byte[] sendMsg = Encoding.ASCII.GetBytes(data);
-                if (sendMsg.Length > 0)
-                {
-                    lock (lockObject)
+                    bool is_impact = check_collision(client_ticket);
+                    if (0 < new_X && new_X + 100 < 800 && 0 < new_Y && new_Y + 100 < 500
+                        && false == is_impact)
                     {
-                        for (int i = 0; i < clients_socket.Count; i++)
-                        {
-                            if (clients_socket[i] != null && clients_socket[i].Connected)
-                            {
-                                try
-                                {
-                                    if(_position.X % 10 == 0 && _position.Y % 10 == 0)
-                                    {
-                                        print_data(data);
-                                    }
-                                    clients_socket[i].Send(sendMsg);
-                                }
-                                catch (SocketException ex)
-                                {
-                                    Console.WriteLine($"Error sending to client {i}: {ex.Message}");
-                                    return;
-                                }
-                            }
-                        }
+                        clients[client_ticket]._position.X = new_X;
+                        clients[client_ticket]._position.Y = new_Y;
                     }
+                    else if(is_impact)
+                    {
+                        clients[client_ticket].dir = (clients[client_ticket].dir + 4) % 8;
+                        clients[client_ticket]._position.X += dir_col[clients[client_ticket].dir] * 4.0f;
+                        clients[client_ticket]._position.Y += dir_row[clients[client_ticket].dir] * 4.0f;
+                    } 
+                    else
+                    {
+                        clients[client_ticket].dir = random.Next(0, 8);
+                    }
+                }
+
+                string data = $"{client_ticket} {clients[client_ticket]._position.X} {clients[client_ticket]._position.Y}";
+                foreach (var client in clients)
+                {
+                    client.send_packet(data);
                 }
             }
         }
@@ -93,7 +97,7 @@ namespace Example
                 server.Listen(20);
                 Console.WriteLine($"Server Start... Listen port {ipep.Port}...");
 
-                List<Thread> clients = new List<Thread>();
+                List<Thread> client_threads = new List<Thread>();
 
                 for (int i = 0; i < 2; i++)
                 {
@@ -106,16 +110,15 @@ namespace Example
                         new_client_socket = server.Accept();
                         if (new_client_socket.Connected)
                         {
-                            lock (lockObject)
-                            {
-                                clients_socket.Add(new_client_socket);
-                            }
+                            Vector2 vector2 = new Vector2(random.Next(10, 700), random.Next(10, 400));
+                            Client new_client = new Client(new_client_socket, vector2);
+                            clients.Add(new_client);
                             break;
                         }
                     }
                     Console.WriteLine($"Client {user_ticket} connected.");
-                    clients.Add(new Thread(() => client_recver(user_ticket)));
-                    clients[i].Start();
+                    client_threads.Add(new Thread(() => move_client(user_ticket)));
+                    client_threads[i].Start();
                 }
 
                 Console.WriteLine($"Server Running...");
