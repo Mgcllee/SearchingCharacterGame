@@ -77,6 +77,8 @@ namespace Example
                     else
                     {
                         clients[client_ticket].dir = random.Next(0, 8);
+                        clients[client_ticket]._position.X += dir_col[clients[client_ticket].dir] * 4.0f;
+                        clients[client_ticket]._position.Y += dir_row[clients[client_ticket].dir] * 4.0f;
                     }
                 }
 
